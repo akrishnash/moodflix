@@ -4,6 +4,7 @@ import { Clapperboard } from "lucide-react";
 import { MoodInput } from "@/components/MoodInput";
 import { RecommendationCard } from "@/components/RecommendationCard";
 import { HistorySidebar } from "@/components/HistorySidebar";
+import { CinemaPosterCarousel } from "@/components/CinemaPosterCarousel";
 import { useCreateRecommendation } from "@/hooks/use-recommendations";
 import { type Recommendation, type MoodRequest } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -36,12 +37,15 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background relative overflow-x-hidden">
+      {/* Background cinema poster carousel */}
+      <CinemaPosterCarousel />
+      
       {/* Decorative ambient gradients */}
-      <div className="fixed top-0 left-0 w-full h-[500px] bg-primary/5 blur-[120px] rounded-full -translate-y-1/2 pointer-events-none" />
-      <div className="fixed bottom-0 right-0 w-[500px] h-[500px] bg-accent/5 blur-[120px] rounded-full translate-y-1/2 pointer-events-none" />
+      <div className="fixed top-0 left-0 w-full h-[500px] bg-primary/5 blur-[120px] rounded-full -translate-y-1/2 pointer-events-none z-10" />
+      <div className="fixed bottom-0 right-0 w-[500px] h-[500px] bg-accent/5 blur-[120px] rounded-full translate-y-1/2 pointer-events-none z-10" />
 
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/5 bg-background/80 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-background/80 backdrop-blur-md relative">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 group cursor-pointer" onClick={handleClear}>
             <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
@@ -58,7 +62,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-12 md:py-24 space-y-24">
+      <main className="container mx-auto px-4 py-12 md:py-24 space-y-24 relative z-10">
         {/* Hero & Input Section */}
         <section className="relative z-10 max-w-4xl mx-auto text-center space-y-8">
           <motion.div

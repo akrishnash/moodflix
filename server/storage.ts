@@ -1,5 +1,4 @@
 import { moodRequests, type MoodRequest, type InsertMoodRequest } from "@shared/schema";
-import { db } from "./db";
 import { desc } from "drizzle-orm";
 
 export interface IStorage {
@@ -9,6 +8,8 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async createMoodRequest(insertRequest: InsertMoodRequest): Promise<MoodRequest> {
+    // Dynamic import to avoid loading db.ts at module load time
+    const { db } = await import("./db");
     const [request] = await db
       .insert(moodRequests)
       .values(insertRequest)
@@ -17,6 +18,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMoodRequests(): Promise<MoodRequest[]> {
+    // Dynamic import to avoid loading db.ts at module load time
+    const { db } = await import("./db");
     return await db
       .select()
       .from(moodRequests)
@@ -24,4 +27,66 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// In-memory storage for development/testing when database is not available
+export class MemoryStorage implements IStorage {
+  private requests: MoodRequest[] = [];
+  private nextId = 1;
+
+  async createMoodRequest(insertRequest: InsertMoodRequest): Promise<MoodRequest> {
+    const request: MoodRequest = {
+      id: this.nextId++,
+      mood: insertRequest.mood,
+      recommendations: insertRequest.recommendations,
+      createdAt: new Date(),
+    };
+    this.requests.unshift(request); // Add to beginning
+    return request;
+  }
+
+  async getMoodRequests(): Promise<MoodRequest[]> {
+    return [...this.requests]; // Return copy, sorted by creation (newest first)
+  }
+}
+
+// Lazy initialization - use database if available, otherwise use in-memory storage
+let _storage: IStorage | null = null;
+
+async function getStorage(): Promise<IStorage> {
+  if (_storage) {
+    return _storage;
+  }
+
+  // Try to use database if DATABASE_URL is set
+  if (process.env.DATABASE_URL) {
+    try {
+      // Test if we can import db (it will throw if DATABASE_URL is invalid)
+      await import("./db");
+      _storage = new DatabaseStorage();
+      console.log("✅ Using database storage");
+      return _storage;
+    } catch (error: any) {
+      console.log("⚠️  Database connection failed:", error.message);
+      console.log("   Falling back to in-memory storage");
+    }
+  }
+
+  // Fallback to in-memory storage
+  if (!process.env.DATABASE_URL) {
+    console.log("⚠️  DATABASE_URL not set, using in-memory storage (history won't persist)");
+    console.log("   To enable database: Set DATABASE_URL environment variable");
+  }
+  _storage = new MemoryStorage();
+  return _storage;
+}
+
+// Wrapper that initializes storage on first use
+export const storage = {
+  createMoodRequest: async (request: InsertMoodRequest) => {
+    const s = await getStorage();
+    return s.createMoodRequest(request);
+  },
+  getMoodRequests: async () => {
+    const s = await getStorage();
+    return s.getMoodRequests();
+  },
+};

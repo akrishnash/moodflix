@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MoodCurator</string>
+    <string name="mood_input_hint">How are you feeling right now? Or what kind of vibe are you looking for?</string>
+    <string name="curate_button">Curate</string>
+    <string name="curating">Curating…</string>
+    <string name="clear_results">Clear results</string>
+    <string name="curated_for_you">Curated for you</string>
+    <string name="history">History</string>
+    <string name="find_to_watch">Find to watch</string>
+    <string name="why_it_fits">Why it fits</string>
+    <string name="no_history">No history yet.</string>
+    <string name="history_subtitle">Revisit your past moods and recommendations.</string>
+    <string name="ai_powered">AI-powered curation based on your emotional context</string>
+    <string name="not_quite_wanted">Not quite what you wanted? Try refining your mood description above.</string>
+    <string name="what_mood_to_watch">What are you in the mood to watch?</string>
+    <string name="mood_description">Tell us how you\'re feeling, and our AI will curate the perfect entertainment list to match your vibe.</string>
+</resources>
+
+
+
+
+
+

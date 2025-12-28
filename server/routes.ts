@@ -3,12 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import OpenAI from "openai";
-
-const openai = new OpenAI({ 
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+import { aiService } from "./ai-service";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -31,31 +26,19 @@ export async function registerRoutes(
     try {
       const { mood } = api.recommendations.create.input.parse(req.body);
 
-      const prompt = `Based on the user's mood: "${mood}", suggest 3-5 entertainment options.
-      Mix of Movies, TV Shows, and YouTube video topics.
-      For each, provide a title, type (Movie, TV Show, or YouTube Video), a brief description, and a reason why it fits the mood.
-      Return ONLY a JSON object with a key "recommendations" containing an array of objects with keys: title, type, description, reason.
-      Example: { "recommendations": [{"title": "The Office", "type": "TV Show", "description": "A mockumentary sitcom...", "reason": "It's lighthearted and funny..."}] }`;
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-      });
-
-      const content = response.choices[0].message.content;
-      if (!content) throw new Error("No response from AI");
-
+      // Use AI service with fallback support
       let recommendations;
       try {
-        const parsed = JSON.parse(content);
-        recommendations = parsed.recommendations || parsed;
+        recommendations = await aiService.generateRecommendations(mood);
+        
+        // Ensure recommendations is an array
         if (!Array.isArray(recommendations)) {
-            // fallback if structure is weird
-            recommendations = [];
+          recommendations = [];
         }
-      } catch (e) {
-          throw new Error("Failed to parse AI response");
+      } catch (error) {
+        console.error("AI service error:", error);
+        // Fallback recommendations will be handled by aiService
+        recommendations = [];
       }
 
       // Store in DB
