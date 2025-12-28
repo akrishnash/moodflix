@@ -7,12 +7,12 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    // Server URL for Physical Device
-    // Your computer's IP address: 192.168.2.107
-    // Make sure your phone and computer are on the same WiFi network
-    private const val BASE_URL = "http://192.168.2.107:5000"
+    // Railway Production URL
+    private const val BASE_URL = "https://moodcurator-backend-production.up.railway.app"
     
-    // For Android Emulator, use: "http://10.0.2.2:5000"
+    // For local development:
+    // - Android Emulator: "http://10.0.2.2:5000"
+    // - Physical Device: "http://YOUR_IP_ADDRESS:5000"
     
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY

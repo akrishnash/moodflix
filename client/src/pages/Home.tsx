@@ -57,6 +57,9 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-4">
+            <span className="text-xs text-muted-foreground hidden md:block">
+              by <span className="text-primary font-medium">akrishnash</span>
+            </span>
             <HistorySidebar onSelect={handleHistorySelect} />
           </div>
         </div>
@@ -126,8 +129,11 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-white/5 bg-background/50 backdrop-blur-sm py-8 mt-auto">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground space-y-2">
           <p>© {new Date().getFullYear()} MoodCurator. Powered by AI.</p>
+          <p className="text-xs opacity-70">
+            Developed by <span className="text-primary font-medium">akrishnash</span>
+          </p>
         </div>
       </footer>
     </div>
