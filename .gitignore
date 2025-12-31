@@ -1,6 +1,23 @@
-node_modules
-dist
-.DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
+# Environment and config files
+config.env
+*.env
+.env.local
+
+# Embeddings cache
+embeddings.npy
+
+# Wallet files (contains sensitive data)
+db/Wallet_*/
+**/Wallet_*/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
