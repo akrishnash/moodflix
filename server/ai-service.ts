@@ -231,6 +231,56 @@ Return ONLY a JSON object with a key "recommendations" containing an array of ob
   }
 }
 
+class OracleVectorSearchProvider implements AIProvider {
+  name = "Oracle Vector Search";
+  private apiUrl: string;
+
+  constructor() {
+    // Get Python API URL from environment, default to localhost for development
+    // On Railway, this should be set to the Python service URL
+    this.apiUrl = process.env.MOVIE_RECOMMENDATION_API_URL || "http://localhost:8000";
+  }
+
+  async generateRecommendations(mood: string): Promise<any[]> {
+    try {
+      const response = await fetch(`${this.apiUrl}/recommend`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: mood,
+          top_k: 5, // Get top 5 recommendations
+          content_type: "Movie", // Focus on movies from our database
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Movie Recommendation API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Convert Oracle Vector Search format to expected format
+      const recommendations = data.recommendations?.map((rec: any) => ({
+        title: rec.title,
+        type: rec.content_type === "YouTube Clips" ? "YouTube Video" : "Movie",
+        description: rec.description || "",
+        reason: `Similarity score: ${rec.similarity_score?.toFixed(2) || "N/A"}. This movie matches your preference for "${mood}".`,
+      })) || [];
+
+      if (recommendations.length > 0) {
+        return recommendations;
+      }
+      
+      throw new Error("No recommendations returned");
+    } catch (error) {
+      console.error("Oracle Vector Search error:", error);
+      throw error;
+    }
+  }
+}
+
 // Fallback recommendations if all AI providers fail
 function getFallbackRecommendations(mood: string): any[] {
   const moodLower = mood.toLowerCase();
@@ -269,7 +319,11 @@ export class AIService {
 
   constructor() {
     this.providers = [
-      // Try Groq first (fast and free)
+      // Try Oracle Vector Search first (uses our actual movie database)
+      ...(process.env.MOVIE_RECOMMENDATION_API_URL || process.env.NODE_ENV === "development" 
+        ? [new OracleVectorSearchProvider()] 
+        : []),
+      // Then Groq (fast and free)
       ...(process.env.GROQ_API_KEY ? [new GroqProvider()] : []),
       // Then Together AI
       ...(process.env.TOGETHER_API_KEY ? [new TogetherAIProvider()] : []),
