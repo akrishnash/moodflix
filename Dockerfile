@@ -18,8 +18,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY requirements.txt ./
 
-# Install Node.js dependencies
-RUN npm ci --only=production
+# Install Node.js dependencies (including devDependencies for build)
+RUN npm ci
 
 # Install Python dependencies (--break-system-packages needed for Debian/Ubuntu PEP 668)
 RUN python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages
@@ -27,7 +27,7 @@ RUN python3 -m pip install --no-cache-dir -r requirements.txt --break-system-pac
 # Copy application files
 COPY . .
 
-# Build the application
+# Build the application (needs tsx from devDependencies)
 RUN npm run build
 
 # Expose port (Railway sets PORT env var)
