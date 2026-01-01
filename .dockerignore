@@ -42,9 +42,9 @@ db/Wallet_*/
 !package-lock.json
 !tsconfig.json
 
-# Client source (not needed in production)
-client/
-script/
+# Client source (needed for build, but won't be in final image)
+# client/ - needed for vite build
+# shared/ - might be needed for build
 shared/
 
 # Test files
@@ -58,9 +58,9 @@ test/
 *.test.js
 *.spec.js
 
-# Build tools
-vite.config.ts
-tsconfig.json
+# Build tools (needed for build, but won't be in final image)
+# vite.config.ts - needed for build (not excluded)
+# tsconfig.json - needed for build (not excluded)
 tailwind.config.*
 postcss.config.*
 
