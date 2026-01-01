@@ -6,13 +6,26 @@ echo "Starting Movie Recommendation Services"
 echo "=========================================="
 
 # Check if Python is available
+# Try python3 first, then python, then check if it's in PATH
 if command -v python3 &> /dev/null; then
     PYTHON_CMD="python3"
 elif command -v python &> /dev/null; then
     PYTHON_CMD="python"
+elif [ -f /nix/store/*/bin/python3 ]; then
+    # Nixpacks installs Python in /nix/store
+    PYTHON_CMD=$(find /nix/store -name python3 -type f -executable 2>/dev/null | head -1)
+    if [ -z "$PYTHON_CMD" ]; then
+        PYTHON_CMD=""
+    fi
 else
     echo "WARNING: Python not found. Starting Express server only..."
     PYTHON_CMD=""
+fi
+
+# Debug: Show Python location if found
+if [ ! -z "$PYTHON_CMD" ]; then
+    echo "Found Python at: $PYTHON_CMD"
+    $PYTHON_CMD --version || echo "Python version check failed"
 fi
 
 # Start Python Movie Recommendation API in background if Python is available
