@@ -44,8 +44,7 @@ db/Wallet_*/
 
 # Client source (needed for build, but won't be in final image)
 # client/ - needed for vite build
-# shared/ - might be needed for build
-shared/
+# shared/ - needed for build (client imports from it)
 
 # Test files
 **/*.test.ts
