@@ -18,19 +18,36 @@ fi
 # Start Python Movie Recommendation API in background if Python is available
 if [ -n "$PYTHON_CMD" ]; then
     echo "[1/2] Starting Python Movie Recommendation API..."
+    echo "Python command: $PYTHON_CMD"
+    echo "Working directory: $(pwd)"
+    echo "Python API file exists: $(test -f movie_recommendation_api.py && echo 'YES' || echo 'NO')"
+    
+    # Try to start Python API
     $PYTHON_CMD movie_recommendation_api.py > /tmp/python_api.log 2>&1 &
     PYTHON_PID=$!
     
     # Wait for Python API to start
-    sleep 5
+    sleep 8
     
     # Check if Python process is still running
     if ! kill -0 $PYTHON_PID 2>/dev/null; then
-        echo "WARNING: Python API process died. Check /tmp/python_api.log for errors."
-        cat /tmp/python_api.log 2>/dev/null || true
+        echo "ERROR: Python API process died. Showing logs:"
+        cat /tmp/python_api.log 2>/dev/null || echo "No log file found"
+        echo "---"
+        echo "Checking if Python can import required modules..."
+        $PYTHON_CMD -c "import fastapi; import uvicorn; import recommend_movies; print('All imports successful')" 2>&1 || echo "Import check failed"
     else
         echo "Python API started successfully (PID: $PYTHON_PID)"
+        echo "Checking if API is responding..."
+        sleep 2
+        if wget -q -O- http://localhost:8000/health >/dev/null 2>&1 || curl -s http://localhost:8000/health >/dev/null 2>&1; then
+            echo "✅ Python API is responding on port 8000"
+        else
+            echo "⚠️  Python API may not be responding yet (this is OK, it may need more time)"
+        fi
     fi
+else
+    echo "WARNING: Python not found. Starting Express server only..."
 fi
 
 # Start Express server (foreground)

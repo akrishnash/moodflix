@@ -21,8 +21,9 @@ COPY requirements.txt ./
 RUN npm ci
 
 # Install Python dependencies (without cache)
-RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir -r requirements.txt
+# Alpine requires --break-system-packages for PEP 668
+RUN python3 -m pip install --no-cache-dir --upgrade pip --break-system-packages && \
+    python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages
 
 # Copy source files needed for build
 COPY . .
@@ -51,8 +52,9 @@ RUN npm ci --only=production && \
     rm -rf /tmp/* /root/.npm
 
 # Install Python dependencies (no cache, no build deps where possible)
-RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir -r requirements.txt && \
+# Alpine also requires --break-system-packages for PEP 668
+RUN python3 -m pip install --no-cache-dir --upgrade pip --break-system-packages && \
+    python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages && \
     python3 -m pip cache purge && \
     rm -rf /root/.cache/pip
 
