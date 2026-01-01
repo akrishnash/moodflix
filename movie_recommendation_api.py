@@ -148,8 +148,9 @@ async def get_recommendations_get(
 if __name__ == "__main__":
     import uvicorn
     
-    # Get port from environment variable (Railway sets this)
-    port = int(os.getenv("PORT", 8000))
+    # Use a fixed port for Python API (8000) since Node.js server uses PORT env var
+    # Both services run in the same container, so Python API uses localhost:8000
+    port = int(os.getenv("PYTHON_API_PORT", 8000))
     
     uvicorn.run(
         "movie_recommendation_api:app",
