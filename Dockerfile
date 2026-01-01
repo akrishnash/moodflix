@@ -8,7 +8,7 @@ RUN apt-get update && \
     python3-pip \
     python3-venv \
     && rm -rf /var/lib/apt/lists/* \
-    && python3 -m pip install --upgrade pip setuptools wheel
+    && python3 -m pip install --upgrade pip setuptools wheel --break-system-packages
 
 # Set working directory
 WORKDIR /app
@@ -20,8 +20,8 @@ COPY requirements.txt ./
 # Install Node.js dependencies
 RUN npm ci --only=production
 
-# Install Python dependencies
-RUN python3 -m pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies (--break-system-packages needed for Debian/Ubuntu PEP 668)
+RUN python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages
 
 # Copy application files
 COPY . .
