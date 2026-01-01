@@ -358,7 +358,9 @@ export class AIService {
           console.log(`Successfully generated recommendations using ${provider.name}`);
           return recommendations;
         }
-      } catch (error) {
+      } catch (error: any) {
+        const errorMsg = error?.message || String(error);
+        console.log(`${provider.name} failed: ${errorMsg.substring(0, 200)}`);
         console.log(`${provider.name} failed, trying next provider...`);
         continue;
       }
