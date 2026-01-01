@@ -1,15 +1,53 @@
+# Dependencies
 node_modules
 __pycache__
 *.pyc
-.env
-.env.local
-.git
-.gitignore
-*.md
+*.pyo
+*.pyd
+venv/
+env/
+
+# Build outputs (will be copied from builder stage)
 dist
 build
+
+# Environment files
+.env
+.env.local
+.env.*
+config.env
+
+# Git
+.git
+.gitignore
+
+# IDE
 .vscode
 .idea
+*.swp
+*.swo
+
+# Documentation
+*.md
+!README.md
+
+# Data files
 embeddings.npy
 db/Wallet_*/
 
+# Client source (not needed in production)
+client/
+script/
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+__tests__/
+tests/
+
+# Other
+.DS_Store
+*.log
+npm-debug.log*
