@@ -238,7 +238,10 @@ class OracleVectorSearchProvider implements AIProvider {
   constructor() {
     // Get Python API URL from environment, default to localhost:8000
     // On Railway, this should be set to the Python service URL
-    this.apiUrl = process.env.MOVIE_RECOMMENDATION_API_URL || "http://localhost:8000";
+    let apiUrl = process.env.MOVIE_RECOMMENDATION_API_URL || "http://localhost:8000";
+    // Strip any leading = (common mistake when setting env vars)
+    apiUrl = apiUrl.replace(/^=+/, '');
+    this.apiUrl = apiUrl;
     console.log(`Oracle Vector Search Provider initialized with URL: ${this.apiUrl}`);
   }
 
