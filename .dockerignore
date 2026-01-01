@@ -20,12 +20,14 @@ config.env
 # Git
 .git
 .gitignore
+.gitattributes
 
 # IDE
 .vscode
 .idea
 *.swp
 *.swo
+*.sublime-*
 
 # Documentation
 *.md
@@ -34,10 +36,16 @@ config.env
 # Data files
 embeddings.npy
 db/Wallet_*/
+*.csv
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
 
 # Client source (not needed in production)
 client/
 script/
+shared/
 
 # Test files
 **/*.test.ts
@@ -46,8 +54,34 @@ script/
 **/*.spec.tsx
 __tests__/
 tests/
+test/
+*.test.js
+*.spec.js
+
+# Build tools
+vite.config.ts
+tsconfig.json
+tailwind.config.*
+postcss.config.*
 
 # Other
 .DS_Store
 *.log
 npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Large data files
+*.npy
+*.npz
+*.pkl
+*.pickle
+
+# Python cache
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Railway specific
+.railway/
