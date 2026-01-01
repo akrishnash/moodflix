@@ -1,0 +1,15 @@
+node_modules
+__pycache__
+*.pyc
+.env
+.env.local
+.git
+.gitignore
+*.md
+dist
+build
+.vscode
+.idea
+embeddings.npy
+db/Wallet_*/
+

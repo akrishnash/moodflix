@@ -1,26 +1,27 @@
 # Dockerfile for Railway - supports both Node.js and Python
 FROM node:18
 
-# Install Python and pip
-RUN apt-get update && apt-get install -y \
+# Install Python and pip (with proper cleanup)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     python3-venv \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pip install --upgrade pip setuptools wheel
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files first (for better caching)
 COPY package*.json ./
 COPY requirements.txt ./
 
 # Install Node.js dependencies
-RUN npm install
+RUN npm ci --only=production
 
 # Install Python dependencies
-RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install -r requirements.txt
+RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY . .
