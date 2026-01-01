@@ -236,13 +236,15 @@ class OracleVectorSearchProvider implements AIProvider {
   private apiUrl: string;
 
   constructor() {
-    // Get Python API URL from environment, default to localhost for development
+    // Get Python API URL from environment, default to localhost:8000
     // On Railway, this should be set to the Python service URL
     this.apiUrl = process.env.MOVIE_RECOMMENDATION_API_URL || "http://localhost:8000";
+    console.log(`Oracle Vector Search Provider initialized with URL: ${this.apiUrl}`);
   }
 
   async generateRecommendations(mood: string): Promise<any[]> {
     try {
+      console.log(`Trying Oracle Vector Search with URL: ${this.apiUrl}...`);
       const response = await fetch(`${this.apiUrl}/recommend`, {
         method: "POST",
         headers: {
@@ -253,13 +255,17 @@ class OracleVectorSearchProvider implements AIProvider {
           top_k: 5, // Get top 5 recommendations
           content_type: "Movie", // Focus on movies from our database
         }),
+        // Add timeout to fail fast if Python API isn't running
+        signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
       if (!response.ok) {
-        throw new Error(`Movie Recommendation API error: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Movie Recommendation API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log(`Oracle Vector Search returned ${data.count || 0} recommendations`);
       
       // Convert Oracle Vector Search format to expected format
       const recommendations = data.recommendations?.map((rec: any) => ({
@@ -270,12 +276,17 @@ class OracleVectorSearchProvider implements AIProvider {
       })) || [];
 
       if (recommendations.length > 0) {
+        console.log(`Successfully generated recommendations using Oracle Vector Search`);
         return recommendations;
       }
       
       throw new Error("No recommendations returned");
-    } catch (error) {
-      console.error("Oracle Vector Search error:", error);
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.message?.includes('ECONNREFUSED') || error.message?.includes('fetch failed')) {
+        console.log(`Oracle Vector Search API not available at ${this.apiUrl} (Python API may not be running)`);
+      } else {
+        console.error("Oracle Vector Search error:", error.message || error);
+      }
       throw error;
     }
   }
@@ -320,9 +331,8 @@ export class AIService {
   constructor() {
     this.providers = [
       // Try Oracle Vector Search first (uses our actual movie database)
-      ...(process.env.MOVIE_RECOMMENDATION_API_URL || process.env.NODE_ENV === "development" 
-        ? [new OracleVectorSearchProvider()] 
-        : []),
+      // Always try it if MOVIE_RECOMMENDATION_API_URL is set, or default to localhost:8000
+      new OracleVectorSearchProvider(),
       // Then Groq (fast and free)
       ...(process.env.GROQ_API_KEY ? [new GroqProvider()] : []),
       // Then Together AI
