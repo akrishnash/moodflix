@@ -1,4 +1,5 @@
 # Dockerfile for Railway - supports both Node.js and Python
+# Updated: 2026-01-01 - Added --break-system-packages for Debian PEP 668
 FROM node:18
 
 # Install Python and pip (with proper cleanup)
