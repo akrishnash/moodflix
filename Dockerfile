@@ -1,15 +1,16 @@
-# Multi-stage Dockerfile for Railway - ultra-optimized for size
+# Multi-stage Dockerfile for Railway - optimized for size with Debian slim
 # Build stage: Install dependencies and build
-FROM node:18-alpine AS builder
+FROM node:18-slim AS builder
 
-# Install Python and build dependencies in Alpine
-RUN apk add --no-cache \
+# Install Python and build dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     python3 \
-    py3-pip \
-    py3-setuptools \
-    py3-wheel \
-    build-base \
-    python3-dev
+    python3-pip \
+    python3-dev \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/* && \
+    python3 -m pip install --upgrade pip setuptools wheel --break-system-packages
 
 WORKDIR /app
 
@@ -20,10 +21,8 @@ COPY requirements.txt ./
 # Install all dependencies (including devDependencies for build)
 RUN npm ci
 
-# Install Python dependencies (without cache)
-# Alpine requires --break-system-packages for PEP 668
-RUN python3 -m pip install --no-cache-dir --upgrade pip --break-system-packages && \
-    python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages
+# Install Python dependencies
+RUN python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages
 
 # Copy source files needed for build
 COPY . .
@@ -32,13 +31,15 @@ COPY . .
 RUN npm run build
 
 # Production stage: Only include runtime files
-FROM node:18-alpine AS production
+FROM node:18-slim AS production
 
 # Install only Python runtime (no build tools)
-RUN apk add --no-cache \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     python3 \
-    py3-pip \
-    && rm -rf /var/cache/apk/*
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/* && \
+    python3 -m pip install --upgrade pip setuptools wheel --break-system-packages
 
 WORKDIR /app
 
@@ -51,10 +52,8 @@ RUN npm ci --only=production && \
     npm cache clean --force && \
     rm -rf /tmp/* /root/.npm
 
-# Install Python dependencies (no cache, no build deps where possible)
-# Alpine also requires --break-system-packages for PEP 668
-RUN python3 -m pip install --no-cache-dir --upgrade pip --break-system-packages && \
-    python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages && \
+# Install Python dependencies (CPU-only torch to save space)
+RUN python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages && \
     python3 -m pip cache purge && \
     rm -rf /root/.cache/pip
 
@@ -78,4 +77,4 @@ EXPOSE ${PORT:-5000}
 RUN chmod +x start.sh
 
 # Start both services
-CMD ["sh", "start.sh"]
+CMD ["bash", "start.sh"]
