@@ -69,7 +69,11 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check endpoint."""
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "recommendations_available": RECOMMENDATIONS_AVAILABLE,
+        "service": "Movie Recommendation API"
+    }
 
 @app.post("/recommend", response_model=RecommendationResponse)
 async def get_recommendations(request: RecommendationRequest):
@@ -82,6 +86,12 @@ async def get_recommendations(request: RecommendationRequest):
     Returns:
         RecommendationResponse with list of movie recommendations
     """
+    if not RECOMMENDATIONS_AVAILABLE or recommend_movies is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Recommendation service is not available. Check server logs for details."
+        )
+    
     try:
         # Validate input
         if not request.prompt or not request.prompt.strip():
