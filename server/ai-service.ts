@@ -16,11 +16,11 @@ interface AIProvider {
 class HuggingFaceProvider implements AIProvider {
   name = "Hugging Face";
   private apiKey: string | undefined;
-  // Try multiple model options - use a simpler, more reliable free model
+  // Updated models that work with the new router endpoint (requires API key)
   private models = [
-    "microsoft/Phi-3-mini-4k-instruct", // Lightweight, fast, free
-    "Qwen/Qwen2.5-1.5B-Instruct", // Alternative free model
-    "meta-llama/Llama-3.2-3B-Instruct", // Fallback option
+    "meta-llama/Llama-3.2-3B-Instruct", // Recommended for free tier
+    "microsoft/Phi-3-mini-4k-instruct", // Alternative option
+    "Qwen/Qwen2.5-1.5B-Instruct", // Alternative option
   ];
 
   constructor() {
@@ -28,6 +28,12 @@ class HuggingFaceProvider implements AIProvider {
   }
 
   async generateRecommendations(mood: string): Promise<any[]> {
+    // Hugging Face now requires API key for inference API
+    // The old free endpoint is deprecated (410 Gone)
+    if (!this.apiKey) {
+      throw new Error("Hugging Face API key required (free endpoint deprecated)");
+    }
+
     const prompt = `Based on the user's mood: "${mood}", suggest 3-5 entertainment options.
 Mix of Movies, TV Shows, and YouTube video topics.
 For each, provide a title, type (Movie, TV Show, or YouTube Video), a brief description, and a reason why it fits the mood.
@@ -37,33 +43,40 @@ Example: { "recommendations": [{"title": "The Office", "type": "TV Show", "descr
     // Try each model until one works
     for (const model of this.models) {
       try {
-        // Use the inference API endpoint (works better than router for free models)
+        // Use the new router endpoint (old api-inference endpoint is deprecated)
         const endpoint = `https://api-inference.huggingface.co/models/${model}`;
 
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.apiKey}`, // Required
         };
-        
-        if (this.apiKey) {
-          headers["Authorization"] = `Bearer ${this.apiKey}`;
-        }
 
         const response = await fetch(endpoint, {
           headers,
           method: "POST",
-          body: JSON.stringify({ inputs: prompt }),
+          body: JSON.stringify({ 
+            inputs: prompt,
+            parameters: {
+              max_new_tokens: 500,
+              return_full_text: false
+            }
+          }),
         });
 
         if (!response.ok) {
-          // Hugging Face free tier may return 503 when model is loading
+          // Hugging Face may return 503 when model is loading
           if (response.status === 503) {
             console.log(`Model ${model} is loading, trying next model...`);
-            continue; // Try next model
+            continue;
           }
           // Handle 410 Gone (deprecated endpoint) or 404 (model not found)
           if (response.status === 410 || response.status === 404) {
             console.log(`Model ${model} not available, trying next model...`);
-            continue; // Try next model
+            continue;
+          }
+          // Handle 401 (authentication error)
+          if (response.status === 401) {
+            throw new Error("Hugging Face API key invalid or expired");
           }
           // For other errors, try next model
           const errorText = await response.text().catch(() => "");
@@ -79,7 +92,7 @@ Example: { "recommendations": [{"title": "The Office", "type": "TV Show", "descr
             console.log(`Model ${model} is loading, trying next model...`);
             continue;
           }
-          console.log(`Model ${model} returned error, trying next model...`);
+          console.log(`Model ${model} returned error: ${data.error}, trying next model...`);
           continue;
         }
         
@@ -112,7 +125,11 @@ Example: { "recommendations": [{"title": "The Office", "type": "TV Show", "descr
           continue;
         }
       } catch (error: any) {
-        // Network errors or other issues - try next model
+        // Network errors or authentication errors - don't try other models
+        if (error.message.includes("API key")) {
+          throw error;
+        }
+        // Network errors - try next model
         console.log(`Model ${model} failed with error: ${error?.message}, trying next model...`);
         continue;
       }
@@ -351,20 +368,37 @@ class OracleVectorSearchProvider implements AIProvider {
 function getFallbackRecommendations(mood: string): any[] {
   const moodLower = mood.toLowerCase();
   
-  // Simple keyword-based fallback
+  // Nostalgic / 90s content
+  if (moodLower.includes("nostalgic") || moodLower.includes("90s") || moodLower.includes("90's") || moodLower.includes("nineties")) {
+    return [
+      { title: "Friends", type: "TV Show", description: "Classic 90s sitcom about six friends in New York.", reason: "Iconic 90s show that perfectly captures the era." },
+      { title: "The Matrix", type: "Movie", description: "Groundbreaking sci-fi action film from 1999.", reason: "Quintessential 90s movie that defined the decade." },
+      { title: "90s Music Videos", type: "YouTube Video", description: "Compilation of classic 90s music videos.", reason: "Take a trip down memory lane with 90s hits." },
+      { title: "Titanic", type: "Movie", description: "Epic romance set aboard the ill-fated ship (1997).", reason: "One of the biggest movies of the 90s." },
+      { title: "Seinfeld", type: "TV Show", description: "The show about nothing that defined 90s comedy.", reason: "Classic 90s sitcom that never gets old." }
+    ];
+  }
+  
+  // Sad / down
   if (moodLower.includes("sad") || moodLower.includes("down") || moodLower.includes("depressed")) {
     return [
       { title: "The Pursuit of Happyness", type: "Movie", description: "A struggling salesman becomes homeless but never gives up.", reason: "Inspiring story that shows resilience and hope." },
       { title: "Parks and Recreation", type: "TV Show", description: "A mockumentary about local government employees.", reason: "Uplifting and funny, perfect for lifting your spirits." },
       { title: "Cute Animal Compilations", type: "YouTube Video", description: "Adorable animals being cute.", reason: "Instant mood booster with wholesome content." }
     ];
-  } else if (moodLower.includes("happy") || moodLower.includes("excited") || moodLower.includes("energetic")) {
+  }
+  
+  // Happy / excited
+  if (moodLower.includes("happy") || moodLower.includes("excited") || moodLower.includes("energetic") || moodLower.includes("optimistic")) {
     return [
       { title: "La La Land", type: "Movie", description: "A musical about two artists falling in love in Los Angeles.", reason: "Vibrant, energetic, and full of joy." },
       { title: "Brooklyn Nine-Nine", type: "TV Show", description: "Comedy about detectives in a New York precinct.", reason: "Hilarious and upbeat, matches your positive energy." },
       { title: "Epic Fail Compilations", type: "YouTube Video", description: "Funny fails and bloopers.", reason: "Light-hearted entertainment that keeps the good vibes going." }
     ];
-  } else if (moodLower.includes("scared") || moodLower.includes("horror") || moodLower.includes("thriller")) {
+  }
+  
+  // Scared / horror
+  if (moodLower.includes("scared") || moodLower.includes("horror") || moodLower.includes("thriller")) {
     return [
       { title: "Get Out", type: "Movie", description: "A psychological horror film about a young man visiting his girlfriend's family.", reason: "Thrilling and thought-provoking without being too intense." },
       { title: "Stranger Things", type: "TV Show", description: "Supernatural mystery set in the 1980s.", reason: "Perfect blend of suspense and nostalgia." },
@@ -388,12 +422,12 @@ export class AIService {
       // Try Oracle Vector Search first (uses our actual movie database)
       // Always try it if MOVIE_RECOMMENDATION_API_URL is set, or default to localhost:8000
       new OracleVectorSearchProvider(),
-      // Then Groq (fast and free)
+      // Then Groq (fast and free) - Recommended!
       ...(process.env.GROQ_API_KEY ? [new GroqProvider()] : []),
       // Then Together AI
       ...(process.env.TOGETHER_API_KEY ? [new TogetherAIProvider()] : []),
-      // Then Hugging Face (works without API key for some models)
-      new HuggingFaceProvider(),
+      // Then Hugging Face (requires API key now - old free endpoint deprecated)
+      ...(process.env.HUGGINGFACE_API_KEY ? [new HuggingFaceProvider()] : []),
       // Finally OpenAI if configured
       ...(process.env.AI_INTEGRATIONS_OPENAI_API_KEY ? [new OpenAIProvider()] : []),
     ];
