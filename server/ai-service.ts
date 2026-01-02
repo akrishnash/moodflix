@@ -272,7 +272,8 @@ class OracleVectorSearchProvider implements AIProvider {
       }
 
       const data = await response.json();
-      console.log(`Oracle Vector Search returned ${data.count || 0} recommendations`);
+      console.log(`Oracle Vector Search API response:`, JSON.stringify(data).substring(0, 200));
+      console.log(`Oracle Vector Search returned ${data.count || data.recommendations?.length || 0} recommendations`);
       
       // Convert Oracle Vector Search format to expected format
       const recommendations = data.recommendations?.map((rec: any) => ({
@@ -283,11 +284,11 @@ class OracleVectorSearchProvider implements AIProvider {
       })) || [];
 
       if (recommendations.length > 0) {
-        console.log(`Successfully generated recommendations using Oracle Vector Search`);
+        console.log(`✅ Successfully generated ${recommendations.length} recommendations using Oracle Vector Search`);
         return recommendations;
       }
       
-      throw new Error("No recommendations returned");
+      throw new Error(`No recommendations returned. API response: ${JSON.stringify(data)}`);
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
       if (error.name === 'AbortError' || errorMsg.includes('ECONNREFUSED') || errorMsg.includes('fetch failed') || errorMsg.includes('ECONNREFUSED')) {
