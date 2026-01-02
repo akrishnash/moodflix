@@ -169,11 +169,15 @@ Return ONLY a JSON object with a key "recommendations" containing an array of ob
           model: "llama-3.1-8b-instant", // Free fast model
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_object" },
+          temperature: 0.7,
+          max_tokens: 1000,
         }),
+        signal: AbortSignal.timeout(15000), // 15 second timeout
       });
 
       if (!response.ok) {
-        throw new Error(`Groq API error: ${response.statusText}`);
+        const errorText = await response.text().catch(() => response.statusText);
+        throw new Error(`Groq API error: ${response.status} ${errorText.substring(0, 100)}`);
       }
 
       const data = await response.json();
@@ -181,9 +185,18 @@ Return ONLY a JSON object with a key "recommendations" containing an array of ob
       if (!content) throw new Error("No response from Groq");
 
       const parsed = JSON.parse(content);
-      return parsed.recommendations || parsed;
-    } catch (error) {
-      console.error("Groq error:", error);
+      const recommendations = parsed.recommendations || (Array.isArray(parsed) ? parsed : []);
+      
+      if (Array.isArray(recommendations) && recommendations.length > 0) {
+        return recommendations;
+      }
+      
+      throw new Error("Invalid response format from Groq");
+    } catch (error: any) {
+      // Re-throw with cleaner message
+      if (error.name === 'AbortError') {
+        throw new Error("Groq request timeout");
+      }
       throw error;
     }
   }
@@ -218,11 +231,15 @@ Return ONLY a JSON object with a key "recommendations" containing an array of ob
           model: "meta-llama/Llama-3-8b-chat-hf", // Free tier model
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_object" },
+          temperature: 0.7,
+          max_tokens: 1000,
         }),
+        signal: AbortSignal.timeout(20000), // 20 second timeout
       });
 
       if (!response.ok) {
-        throw new Error(`Together AI API error: ${response.statusText}`);
+        const errorText = await response.text().catch(() => response.statusText);
+        throw new Error(`Together AI API error: ${response.status} ${errorText.substring(0, 100)}`);
       }
 
       const data = await response.json();
@@ -230,9 +247,17 @@ Return ONLY a JSON object with a key "recommendations" containing an array of ob
       if (!content) throw new Error("No response from Together AI");
 
       const parsed = JSON.parse(content);
-      return parsed.recommendations || parsed;
-    } catch (error) {
-      console.error("Together AI error:", error);
+      const recommendations = parsed.recommendations || (Array.isArray(parsed) ? parsed : []);
+      
+      if (Array.isArray(recommendations) && recommendations.length > 0) {
+        return recommendations;
+      }
+      
+      throw new Error("Invalid response format from Together AI");
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error("Together AI request timeout");
+      }
       throw error;
     }
   }
@@ -278,7 +303,6 @@ Return ONLY a JSON object with a key "recommendations" containing an array of ob
 class OracleVectorSearchProvider implements AIProvider {
   name = "Oracle Vector Search";
   private apiUrl: string;
-  private enabled: boolean;
 
   constructor() {
     // Get Python API URL from environment, default to localhost:8000
@@ -291,23 +315,10 @@ class OracleVectorSearchProvider implements AIProvider {
       apiUrl = `http://${apiUrl}`;
     }
     this.apiUrl = apiUrl;
-    
-    // Enable Oracle Vector Search unless explicitly disabled
-    // On Railway, if Python API is in same service, localhost:8000 works fine
-    const isExplicitlyDisabled = process.env.DISABLE_ORACLE_VECTOR_SEARCH === 'true';
-    this.enabled = !isExplicitlyDisabled;
-    
-    console.log(`Oracle Vector Search Provider initialized with URL: ${this.apiUrl} (enabled: ${this.enabled})`);
   }
 
   async generateRecommendations(mood: string): Promise<any[]> {
-    // Skip if disabled
-    if (!this.enabled) {
-      throw new Error("Oracle Vector Search is disabled");
-    }
-
     try {
-      console.log(`Trying Oracle Vector Search with URL: ${this.apiUrl}...`);
       const response = await fetch(`${this.apiUrl}/recommend`, {
         method: "POST",
         headers: {
@@ -318,24 +329,15 @@ class OracleVectorSearchProvider implements AIProvider {
           top_k: 5, // Get top 5 recommendations
           content_type: "Movie", // Focus on movies from our database
         }),
-        // Add timeout to fail fast if Python API isn't running
-        signal: AbortSignal.timeout(5000), // Reduced to 5 seconds for faster fallback
+        // Fast timeout to fail quickly if Python API isn't running
+        signal: AbortSignal.timeout(3000), // 3 seconds for fast fallback
       });
 
       if (!response.ok) {
-        let errorText = "";
-        try {
-          const errorData = await response.json();
-          errorText = errorData.detail || errorData.message || JSON.stringify(errorData);
-        } catch {
-          errorText = await response.text();
-        }
-        throw new Error(`Python API error (${response.status}): ${errorText}`);
+        throw new Error(`API returned ${response.status}`);
       }
 
       const data = await response.json();
-      console.log(`Oracle Vector Search API response:`, JSON.stringify(data).substring(0, 200));
-      console.log(`Oracle Vector Search returned ${data.count || data.recommendations?.length || 0} recommendations`);
       
       // Convert Oracle Vector Search format to expected format
       const recommendations = data.recommendations?.map((rec: any) => ({
@@ -346,20 +348,13 @@ class OracleVectorSearchProvider implements AIProvider {
       })) || [];
 
       if (recommendations.length > 0) {
-        console.log(`✅ Successfully generated ${recommendations.length} recommendations using Oracle Vector Search`);
         return recommendations;
       }
       
-      throw new Error(`No recommendations returned. API response: ${JSON.stringify(data)}`);
+      throw new Error("No recommendations returned");
     } catch (error: any) {
-      const errorMsg = error?.message || String(error);
-      if (error.name === 'AbortError' || errorMsg.includes('ECONNREFUSED') || errorMsg.includes('fetch failed')) {
-        // Connection errors are expected if Python API isn't running - just log briefly
-        console.log(`Oracle Vector Search API not available at ${this.apiUrl} (Python API may not be running)`);
-      } else {
-        console.error(`Oracle Vector Search error: ${errorMsg}`);
-      }
-      throw error;
+      // Silently fail - will try next provider
+      throw new Error("Oracle Vector Search unavailable");
     }
   }
 }
@@ -418,42 +413,51 @@ export class AIService {
   private providers: AIProvider[];
 
   constructor() {
+    // Prioritize fast, reliable providers first
     this.providers = [
-      // Try Oracle Vector Search first (uses our actual movie database)
-      // Always try it if MOVIE_RECOMMENDATION_API_URL is set, or default to localhost:8000
-      new OracleVectorSearchProvider(),
-      // Then Groq (fast and free) - Recommended!
+      // Groq is fastest and most reliable - try first if available
       ...(process.env.GROQ_API_KEY ? [new GroqProvider()] : []),
-      // Then Together AI
+      // Together AI is also fast and reliable
       ...(process.env.TOGETHER_API_KEY ? [new TogetherAIProvider()] : []),
-      // Then Hugging Face (requires API key now - old free endpoint deprecated)
-      ...(process.env.HUGGINGFACE_API_KEY ? [new HuggingFaceProvider()] : []),
-      // Finally OpenAI if configured
+      // OpenAI is high quality if configured
       ...(process.env.AI_INTEGRATIONS_OPENAI_API_KEY ? [new OpenAIProvider()] : []),
+      // Hugging Face with API key
+      ...(process.env.HUGGINGFACE_API_KEY ? [new HuggingFaceProvider()] : []),
+      // Oracle Vector Search last (may not be running, so try after reliable providers)
+      // Only try if explicitly enabled or if we're confident Python API is running
+      ...(process.env.ENABLE_ORACLE_VECTOR_SEARCH === 'true' ? [new OracleVectorSearchProvider()] : []),
     ];
+    
+    // Log which providers are available
+    const availableProviders = this.providers.map(p => p.name).join(", ");
+    if (availableProviders) {
+      console.log(`✅ AI Providers available: ${availableProviders}`);
+    } else {
+      console.log("⚠️  No AI API keys configured - using fallback recommendations");
+    }
   }
 
   async generateRecommendations(mood: string): Promise<any[]> {
     // Try each provider in order until one succeeds
     for (const provider of this.providers) {
       try {
-        console.log(`Trying ${provider.name}...`);
         const recommendations = await provider.generateRecommendations(mood);
         
         if (Array.isArray(recommendations) && recommendations.length > 0) {
-          console.log(`Successfully generated recommendations using ${provider.name}`);
+          console.log(`✅ Generated recommendations using ${provider.name}`);
           return recommendations;
         }
       } catch (error: any) {
-        const errorMsg = error?.message || String(error);
-        console.log(`${provider.name} failed: ${errorMsg.substring(0, 200)}`);
-        console.log(`${provider.name} failed, trying next provider...`);
+        // Silently try next provider - only log if it's the last one
+        const isLastProvider = this.providers.indexOf(provider) === this.providers.length - 1;
+        if (isLastProvider) {
+          console.log(`⚠️  ${provider.name} unavailable, using fallback recommendations`);
+        }
         continue;
       }
     }
 
-    // If all providers fail, use fallback
-    console.log("All AI providers failed, using fallback recommendations");
+    // If all providers fail, use fallback (always works)
     return getFallbackRecommendations(mood);
   }
 }
