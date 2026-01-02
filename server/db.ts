@@ -4,11 +4,19 @@ import * as schema from "@shared/schema";
 
 const { Pool } = pg;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+// Don't throw error - let storage.ts handle missing DATABASE_URL gracefully
+let pool: pg.Pool | null = null;
+let db: ReturnType<typeof drizzle> | null = null;
+
+if (process.env.DATABASE_URL) {
+  try {
+    pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    db = drizzle(pool, { schema });
+  } catch (error) {
+    console.error("Failed to initialize database:", error);
+    pool = null;
+    db = null;
+  }
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle(pool, { schema });
+export { pool, db };

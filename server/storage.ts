@@ -10,6 +10,9 @@ export class DatabaseStorage implements IStorage {
   async createMoodRequest(insertRequest: InsertMoodRequest): Promise<MoodRequest> {
     // Dynamic import to avoid loading db.ts at module load time
     const { db } = await import("./db");
+    if (!db) {
+      throw new Error("Database not initialized. DATABASE_URL may be missing or invalid.");
+    }
     const [request] = await db
       .insert(moodRequests)
       .values(insertRequest)
@@ -20,6 +23,9 @@ export class DatabaseStorage implements IStorage {
   async getMoodRequests(): Promise<MoodRequest[]> {
     // Dynamic import to avoid loading db.ts at module load time
     const { db } = await import("./db");
+    if (!db) {
+      throw new Error("Database not initialized. DATABASE_URL may be missing or invalid.");
+    }
     return await db
       .select()
       .from(moodRequests)
@@ -59,21 +65,23 @@ async function getStorage(): Promise<IStorage> {
   // Try to use database if DATABASE_URL is set
   if (process.env.DATABASE_URL) {
     try {
-      // Test if we can import db (it will throw if DATABASE_URL is invalid)
-      await import("./db");
-      _storage = new DatabaseStorage();
-      console.log("✅ Using database storage");
-      return _storage;
+      // Test if we can import db and it's initialized
+      const { db } = await import("./db");
+      if (db) {
+        _storage = new DatabaseStorage();
+        console.log("✅ Using database storage");
+        return _storage;
+      } else {
+        console.log("⚠️  Database not initialized, falling back to in-memory storage");
+      }
     } catch (error: any) {
       console.log("⚠️  Database connection failed:", error.message);
       console.log("   Falling back to in-memory storage");
     }
-  }
-
-  // Fallback to in-memory storage
-  if (!process.env.DATABASE_URL) {
-    console.log("⚠️  DATABASE_URL not set, using in-memory storage (history won't persist)");
-    console.log("   To enable database: Set DATABASE_URL environment variable");
+  } else {
+    // Only show warning if DATABASE_URL is explicitly not set
+    // (don't spam logs if it's just not configured)
+    console.log("ℹ️  DATABASE_URL not set, using in-memory storage (history won't persist across restarts)");
   }
   _storage = new MemoryStorage();
   return _storage;
