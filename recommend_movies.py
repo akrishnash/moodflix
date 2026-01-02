@@ -98,13 +98,19 @@ def search_similar_movies(prompt: str, top_k: int = 10, content_type: Optional[s
     """
     connection = None
     try:
+        print(f"Starting search for: '{prompt}' (top_k={top_k}, content_type={content_type})")
         # Get database connection
         connection = get_oracle_connection()
         cursor = connection.cursor()
         
         # Generate embedding for the prompt
         print(f"Generating embedding for prompt: '{prompt[:50]}...'")
-        prompt_embedding_str = generate_prompt_embedding(prompt)
+        try:
+            prompt_embedding_str = generate_prompt_embedding(prompt)
+            print("Embedding generated successfully")
+        except Exception as e:
+            print(f"ERROR generating embedding: {e}")
+            raise Exception(f"Failed to generate embedding: {e}")
         
         # Build SQL query with optional content_type filter
         if content_type:
@@ -151,10 +157,13 @@ def search_similar_movies(prompt: str, top_k: int = 10, content_type: Optional[s
             })
         
         cursor.close()
+        print(f"Found {len(movies)} movies")
         return movies
         
     except Exception as e:
-        print(f"Error searching movies: {e}")
+        print(f"ERROR searching movies: {e}")
+        import traceback
+        traceback.print_exc()
         if connection:
             connection.rollback()
         raise
