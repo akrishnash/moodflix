@@ -64,6 +64,7 @@ COPY --from=builder /app/dist ./dist
 COPY start.sh ./
 COPY movie_recommendation_api.py ./
 COPY recommend_movies.py ./
+COPY process_kaggle.py ./
 
 # Aggressively remove unnecessary files
 RUN rm -rf /tmp/* /var/tmp/* /var/cache/* && \
