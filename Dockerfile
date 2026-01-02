@@ -21,13 +21,7 @@ COPY requirements.txt ./
 # Install all dependencies (including devDependencies for build)
 RUN npm ci
 
-# Install CPU-only PyTorch first (much smaller than GPU version)
-RUN python3 -m pip install --no-cache-dir \
-    --index-url https://download.pytorch.org/whl/cpu \
-    torch torchvision torchaudio \
-    --break-system-packages
-
-# Install other Python dependencies
+# Install Python dependencies (no PyTorch needed - using Hugging Face API)
 RUN python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages
 
 # Copy source files needed for build
@@ -58,16 +52,10 @@ RUN npm ci --only=production && \
     npm cache clean --force && \
     rm -rf /tmp/* /root/.npm /root/.cache
 
-# Install CPU-only PyTorch first (much smaller than GPU version)
-RUN python3 -m pip install --no-cache-dir \
-    --index-url https://download.pytorch.org/whl/cpu \
-    torch torchvision torchaudio \
-    --break-system-packages
-
-# Install other Python dependencies
+# Install Python dependencies (no PyTorch needed - using Hugging Face API)
 RUN python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages && \
     python3 -m pip cache purge && \
-    rm -rf /root/.cache/pip /root/.cache/torch /tmp/*
+    rm -rf /root/.cache/pip /tmp/*
 
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
