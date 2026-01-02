@@ -289,10 +289,13 @@ class OracleVectorSearchProvider implements AIProvider {
       
       throw new Error("No recommendations returned");
     } catch (error: any) {
-      if (error.name === 'AbortError' || error.message?.includes('ECONNREFUSED') || error.message?.includes('fetch failed')) {
-        console.log(`Oracle Vector Search API not available at ${this.apiUrl} (Python API may not be running)`);
+      const errorMsg = error?.message || String(error);
+      if (error.name === 'AbortError' || errorMsg.includes('ECONNREFUSED') || errorMsg.includes('fetch failed') || errorMsg.includes('ECONNREFUSED')) {
+        console.error(`Oracle Vector Search API not available at ${this.apiUrl} (Python API may not be running)`);
+        console.error(`Connection error details: ${errorMsg}`);
       } else {
-        console.error("Oracle Vector Search error:", error.message || error);
+        console.error(`Oracle Vector Search error: ${errorMsg}`);
+        console.error(`Full error:`, error);
       }
       throw error;
     }
