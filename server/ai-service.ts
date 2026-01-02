@@ -267,8 +267,14 @@ class OracleVectorSearchProvider implements AIProvider {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Movie Recommendation API error: ${response.status} ${response.statusText} - ${errorText}`);
+        let errorText = "";
+        try {
+          const errorData = await response.json();
+          errorText = errorData.detail || errorData.message || JSON.stringify(errorData);
+        } catch {
+          errorText = await response.text();
+        }
+        throw new Error(`Python API error (${response.status}): ${errorText}`);
       }
 
       const data = await response.json();

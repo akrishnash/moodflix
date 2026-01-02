@@ -134,12 +134,15 @@ async def get_recommendations(request: RecommendationRequest):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error in recommendation API: {e}")
+        error_msg = str(e)
+        print(f"ERROR in recommendation API: {error_msg}")
         import traceback
         traceback.print_exc()
+        
+        # Return proper error response that Node.js can handle
         raise HTTPException(
             status_code=500,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Failed to get recommendations: {error_msg}"
         )
 
 @app.get("/recommend")
