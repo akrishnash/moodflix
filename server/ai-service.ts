@@ -329,12 +329,13 @@ class OracleVectorSearchProvider implements AIProvider {
           top_k: 5, // Get top 5 recommendations
           content_type: "Movie", // Focus on movies from our database
         }),
-        // Fast timeout to fail quickly if Python API isn't running
-        signal: AbortSignal.timeout(3000), // 3 seconds for fast fallback
+        // Reasonable timeout - Python API should respond quickly
+        signal: AbortSignal.timeout(10000), // 10 seconds
       });
 
       if (!response.ok) {
-        throw new Error(`API returned ${response.status}`);
+        const errorText = await response.text().catch(() => `Status ${response.status}`);
+        throw new Error(`Python API error: ${response.status} - ${errorText.substring(0, 100)}`);
       }
 
       const data = await response.json();
@@ -343,18 +344,24 @@ class OracleVectorSearchProvider implements AIProvider {
       const recommendations = data.recommendations?.map((rec: any) => ({
         title: rec.title,
         type: rec.content_type === "YouTube Clips" ? "YouTube Video" : "Movie",
-        description: rec.description || "",
-        reason: `Similarity score: ${rec.similarity_score?.toFixed(2) || "N/A"}. This movie matches your preference for "${mood}".`,
+        description: rec.description || rec.overview || "",
+        reason: rec.similarity_score 
+          ? `Similarity: ${rec.similarity_score.toFixed(2)}. Matches your mood: "${mood}".`
+          : `Recommended based on your mood: "${mood}".`,
       })) || [];
 
       if (recommendations.length > 0) {
         return recommendations;
       }
       
-      throw new Error("No recommendations returned");
+      throw new Error("No recommendations returned from Oracle Vector Search");
     } catch (error: any) {
-      // Silently fail - will try next provider
-      throw new Error("Oracle Vector Search unavailable");
+      // Provide more informative error for debugging
+      const errorMsg = error?.message || String(error);
+      if (error.name === 'AbortError') {
+        throw new Error("Oracle Vector Search timeout");
+      }
+      throw new Error(`Oracle Vector Search: ${errorMsg}`);
     }
   }
 }
@@ -413,19 +420,24 @@ export class AIService {
   private providers: AIProvider[];
 
   constructor() {
-    // Prioritize fast, reliable providers first
+    // Oracle Vector Search uses your actual movie database - try it first if available
+    // Since Python API is confirmed running, include it by default
+    const includeOracleVectorSearch = 
+      process.env.ENABLE_ORACLE_VECTOR_SEARCH !== 'false' && // Allow explicit disable
+      (process.env.MOVIE_RECOMMENDATION_API_URL || process.env.RAILWAY_ENVIRONMENT);
+    
+    // Prioritize providers: Oracle Vector Search first (uses your database), then fast external APIs
     this.providers = [
-      // Groq is fastest and most reliable - try first if available
+      // Oracle Vector Search first - uses your actual movie database (best results!)
+      ...(includeOracleVectorSearch ? [new OracleVectorSearchProvider()] : []),
+      // Groq is fastest external API - try second if available
       ...(process.env.GROQ_API_KEY ? [new GroqProvider()] : []),
       // Together AI is also fast and reliable
       ...(process.env.TOGETHER_API_KEY ? [new TogetherAIProvider()] : []),
       // OpenAI is high quality if configured
       ...(process.env.AI_INTEGRATIONS_OPENAI_API_KEY ? [new OpenAIProvider()] : []),
-      // Hugging Face with API key
+      // Hugging Face with API key (less reliable)
       ...(process.env.HUGGINGFACE_API_KEY ? [new HuggingFaceProvider()] : []),
-      // Oracle Vector Search last (may not be running, so try after reliable providers)
-      // Only try if explicitly enabled or if we're confident Python API is running
-      ...(process.env.ENABLE_ORACLE_VECTOR_SEARCH === 'true' ? [new OracleVectorSearchProvider()] : []),
     ];
     
     // Log which providers are available
@@ -433,7 +445,7 @@ export class AIService {
     if (availableProviders) {
       console.log(`✅ AI Providers available: ${availableProviders}`);
     } else {
-      console.log("⚠️  No AI API keys configured - using fallback recommendations");
+      console.log("⚠️  No AI providers configured - using fallback recommendations");
     }
   }
 
