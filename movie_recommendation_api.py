@@ -13,8 +13,16 @@ import os
 import sys
 
 # Import recommendation functions
-sys.path.insert(0, os.path.dirname(__file__))
-from recommend_movies import recommend_movies
+# Try to import, but allow API to start even if it fails (for health checks)
+try:
+    sys.path.insert(0, os.path.dirname(__file__))
+    from recommend_movies import recommend_movies
+    RECOMMENDATIONS_AVAILABLE = True
+except Exception as e:
+    print(f"WARNING: Could not import recommend_movies: {e}")
+    print("API will start but /recommend endpoint will not work until this is fixed.")
+    RECOMMENDATIONS_AVAILABLE = False
+    recommend_movies = None
 
 app = FastAPI(
     title="Movie Recommendation API",
