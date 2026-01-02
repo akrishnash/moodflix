@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Railway - optimized for size with Debian slim
+# Multi-stage Dockerfile for Railway - ultra-optimized for size
 # Build stage: Install dependencies and build
 FROM node:18-slim AS builder
 
@@ -21,7 +21,13 @@ COPY requirements.txt ./
 # Install all dependencies (including devDependencies for build)
 RUN npm ci
 
-# Install Python dependencies
+# Install CPU-only PyTorch first (much smaller than GPU version)
+RUN python3 -m pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cpu \
+    torch torchvision torchaudio \
+    --break-system-packages
+
+# Install other Python dependencies
 RUN python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages
 
 # Copy source files needed for build
@@ -50,12 +56,18 @@ COPY requirements.txt ./
 # Install only production dependencies and aggressively clean
 RUN npm ci --only=production && \
     npm cache clean --force && \
-    rm -rf /tmp/* /root/.npm
+    rm -rf /tmp/* /root/.npm /root/.cache
 
-# Install Python dependencies (CPU-only torch to save space)
+# Install CPU-only PyTorch first (much smaller than GPU version)
+RUN python3 -m pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cpu \
+    torch torchvision torchaudio \
+    --break-system-packages
+
+# Install other Python dependencies
 RUN python3 -m pip install --no-cache-dir -r requirements.txt --break-system-packages && \
     python3 -m pip cache purge && \
-    rm -rf /root/.cache/pip
+    rm -rf /root/.cache/pip /root/.cache/torch /tmp/*
 
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
@@ -65,10 +77,14 @@ COPY start.sh ./
 COPY movie_recommendation_api.py ./
 COPY recommend_movies.py ./
 
-# Remove any unnecessary files
-RUN rm -rf /tmp/* /var/tmp/* && \
+# Aggressively remove unnecessary files
+RUN rm -rf /tmp/* /var/tmp/* /var/cache/* && \
     find /app -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
-    find /app -type f -name "*.pyc" -delete 2>/dev/null || true
+    find /app -type f -name "*.pyc" -delete 2>/dev/null || true && \
+    find /usr -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr -type f -name "*.pyc" -delete 2>/dev/null || true && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Expose port
 EXPOSE ${PORT:-5000}
