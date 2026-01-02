@@ -34,12 +34,13 @@ if [ -n "$PYTHON_CMD" ]; then
         echo "Python API started successfully (PID: $PYTHON_PID)"
         echo "Checking if API is responding..."
         sleep 2
-        # Try to check if API is responding (curl may not be available, so use python)
-        if $PYTHON_CMD -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)" 2>/dev/null; then
+        # Try to check if API is responding
+        sleep 3
+        if $PYTHON_CMD -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)" 2>/dev/null; then
             echo "✅ Python API is responding on port 8000"
         else
-            echo "⚠️  Python API may not be ready yet. Showing recent logs:"
-            tail -n 30 /tmp/python_api.log 2>/dev/null || echo "No logs available"
+            echo "❌ Python API health check failed. Full logs:"
+            cat /tmp/python_api.log 2>/dev/null || echo "No logs available"
         fi
     fi
 fi

@@ -173,10 +173,21 @@ if __name__ == "__main__":
     # Both services run in the same container, so Python API uses localhost:8000
     port = int(os.getenv("PYTHON_API_PORT", 8000))
     
-    uvicorn.run(
-        "movie_recommendation_api:app",
-        host="0.0.0.0",
-        port=port,
-        reload=False  # Set to True for development
-    )
+    print(f"Starting Movie Recommendation API on port {port}...")
+    print(f"Health check: http://localhost:{port}/health")
+    print(f"Recommend endpoint: http://localhost:{port}/recommend")
+    
+    try:
+        uvicorn.run(
+            "movie_recommendation_api:app",
+            host="0.0.0.0",
+            port=port,
+            reload=False,
+            log_level="info"
+        )
+    except Exception as e:
+        print(f"FATAL ERROR starting Python API: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
