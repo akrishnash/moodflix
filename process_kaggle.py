@@ -18,13 +18,28 @@ import pandas as pd
 import oracledb
 import json
 import os
-from sentence_transformers import SentenceTransformer
 from typing import List, Tuple
 import numpy as np
 
 # Thin mode is the default in python-oracledb
 # No need to call init_oracle_client() for Thin mode
 # If you need Thick mode, uncomment: oracledb.init_oracle_client()
+
+# Lazy import of sentence_transformers (only needed for create_embeddings)
+_model = None
+
+def get_model():
+    """Lazy load sentence transformer model (only when needed for embeddings)."""
+    global _model
+    if _model is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+            print("Loading sentence transformer model...")
+            _model = SentenceTransformer('all-MiniLM-L6-v2')
+            print("Model loaded successfully!")
+        except ImportError:
+            raise ImportError("sentence-transformers is required for creating embeddings. Install it with: pip install sentence-transformers")
+    return _model
 
 def load_config():
     """Load configuration from config.env file or environment variables."""
@@ -52,10 +67,9 @@ def load_config():
     
     return config
 
-# Initialize the sentence transformer model
-print("Loading sentence transformer model...")
-model = SentenceTransformer('all-MiniLM-L6-v2')
-print("Model loaded successfully!")
+# Model is now loaded lazily via get_model() function
+# This allows process_kaggle.py to be imported without sentence-transformers
+# if only connection/config functions are needed
 
 def parse_json_field(field: str) -> str:
     """Parse JSON string field and extract names/values."""
@@ -138,6 +152,7 @@ def load_and_merge_data() -> pd.DataFrame:
 
 def create_embeddings(search_blobs: List[str], batch_size: int = 32) -> np.ndarray:
     """Create embeddings for search blobs using sentence-transformers."""
+    model = get_model()  # Lazy load model only when needed
     print(f"Creating embeddings for {len(search_blobs)} items...")
     embeddings = model.encode(search_blobs, batch_size=batch_size, show_progress_bar=True)
     print(f"Created embeddings with shape: {embeddings.shape}")
